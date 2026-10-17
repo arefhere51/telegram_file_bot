@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پنل مدیریت فایل‌ها</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #3b82f6;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+        .stats {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            min-width: 140px;
+        }
+        .stat-card .label {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        .stat-card .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        .table-wrap {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 14px 16px;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: rgba(0,0,0,0.25);
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.03); }
+        .name {
+            font-weight: 500;
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .link {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .link:hover { text-decoration: underline; }
+        .btn {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-decoration: none;
+        }
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        .empty {
+            text-align: center;
+            padding: 48px 16px;
+            color: var(--muted);
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+        }
+        footer {
+            margin-top: 32px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        @media (max-width: 700px) {
+            .hide-mobile { display: none; }
+            th, td { padding: 10px 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📁 پنل مدیریت فایل‌ها</h1>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="label">تعداد فایل‌ها</div>
+                    <div class="value">{{ stats.count }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">حجم کل</div>
+                    <div class="value">{{ stats.total_size }}</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="table-wrap">
+            {% if files %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>نام فایل</th>
+                        <th>حجم</th>
+                        <th class="hide-mobile">تاریخ</th>
+                        <th class="hide-mobile">دانلود</th>
+                        <th>لینک</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in files %}
+                    <tr>
+                        <td class="name" title="{{ f.original_name }}">{{ f.original_name }}</td>
+                        <td>{{ human_size(f.size) }}</td>
+                        <td class="hide-mobile">{{ format_time(f.created_at) }}</td>
+                        <td class="hide-mobile"><span class="badge">{{ f.download_count }}</span></td>
+                        <td>
+                            <a class="link" href="/d/{{ f.id }}" target="_blank">دانلود</a>
+                        </td>
+                        <td>
+                            <form method="post" action="/delete/{{ f.id }}" onsubmit="return confirm('آیا مطمئن هستید؟');">
+                                <button type="submit" class="btn btn-danger">حذف</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">
+                هنوز فایلی آپلود نشده است.<br>
+                فایل را در تلگرام برای ربات بفرستید.
+            </div>
+            {% endif %}
+        </div>
+
+        <footer>
+            Telegram File Bot • Port {{ request.url.port or 14141 }}
+        </footer>
+    </div>
+</body>
+</html>

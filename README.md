@@ -1,0 +1,63 @@
+# Telegram File Bot
+
+ربات تلگرام برای دریافت فایل‌های حجیم (تا ۲ گیگابایت)، ذخیره روی سرور و ارائه لینک مستقیم دانلود + پنل مدیریت وب.
+
+## امکانات
+
+- دریافت فایل تا **۲ گیگابایت** از تلگرام (با Pyrogram)
+- پشتیبانی از ارسال لینک مستقیم برای دانلود
+- لینک دانلود مستقیم و دائمی
+- پنل مدیریت وب روی پورت **14141**
+- نوار پیشرفت زنده در تلگرام
+- نصب با **یک دستور تک‌خطی**
+
+## نصب سریع (یک خط)
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/telegram_file_bot/main/install.sh)
+```
+
+برای محیط‌های Docker / بدون systemd:
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/telegram_file_bot/main/install.sh) --mode foreground
+```
+
+## پیش‌نیازها
+
+1. **API_ID و API_HASH** از [my.telegram.org](https://my.telegram.org)
+2. **توکن ربات** از [@BotFather](https://t.me/BotFather)
+3. **آیدی عددی** خودتان (با [@userinfobot](https://t.me/userinfobot) بگیرید)
+
+## استفاده
+
+1. فایل را برای ربات بفرستید (یا لینک مستقیم بفرستید)
+2. ربات دانلود می‌کند و لینک مستقیم می‌دهد
+3. پنل مدیریت: `http://IP:14141`
+
+## دستورات ربات
+
+| دستور   | توضیح              |
+|---------|--------------------|
+| /start  | شروع               |
+| /list   | لیست آخرین فایل‌ها |
+| /stats  | آمار فضای مصرفی    |
+| /help   | راهنما             |
+
+## ساختار
+
+```
+telegram_file_bot/
+├── main.py          # نقطه شروع (ربات + وب)
+├── bot.py           # منطق ربات Pyrogram
+├── web_app.py       # پنل FastAPI
+├── config.py
+├── database.py
+├── templates/
+├── install.sh       # نصب‌کننده تک‌دستوری
+└── requirements.txt
+```
+
+## لایسنس
+
+MIT
