@@ -7,7 +7,7 @@ set -euo pipefail
 #    bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USER/telegram_file_bot/main/install.sh)
 # ============================================================
 
-REPO_URL="${REPO_URL:-https://github.com/YOUR_USERNAME/telegram_file_bot.git}"
+REPO_URL="${REPO_URL:-https://github.com/arefhere51/telegram_file_bot.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/telegram_file_bot}"
 SERVICE_NAME="telegram-file-bot"
 PYTHON_MIN="3.10"
