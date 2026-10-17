@@ -14,13 +14,13 @@
 ## نصب سریع (یک خط)
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/telegram_file_bot/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/arefhere51/telegram_file_bot/main/install.sh)
 ```
 
 برای محیط‌های Docker / بدون systemd:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/YOUR_USERNAME/telegram_file_bot/main/install.sh) --mode foreground
+bash <(curl -Ls https://raw.githubusercontent.com/arefhere51/telegram_file_bot/main/install.sh) --mode foreground
 ```
 
 ## پیش‌نیازها
