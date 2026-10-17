@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,12 @@ app = Client(
 
 def is_admin(user_id: int) -> bool:
     return user_id in settings.admin_ids
+
+
+def safe_filename(name: str, fallback: str = "download") -> str:
+    name = name.replace("\\", "/").split("/")[-1]
+    name = re.sub(r"[\x00-\x1f\x7f]", "_", name).strip(" .")
+    return (name or fallback)[:240]
 
 
 def human_size(size: int) -> str:
@@ -120,11 +127,11 @@ async def file_handler(client: Client, message: Message):
     # For photo, take the largest
     if message.photo:
         file_size = message.photo.file_size or 0
-        file_name = f"photo_{message.photo.file_unique_id}.jpg"
+        file_name = safe_filename(f"photo_{message.photo.file_unique_id}.jpg")
         mime = "image/jpeg"
     else:
         file_size = media.file_size or 0
-        file_name = getattr(media, "file_name", None) or f"file_{media.file_unique_id}"
+        file_name = safe_filename(getattr(media, "file_name", None) or f"file_{media.file_unique_id}")
         mime = getattr(media, "mime_type", None)
 
     if file_size > settings.max_file_size_bytes:
@@ -176,7 +183,7 @@ async def file_handler(client: Client, message: Message):
             return
 
         final_size = Path(downloaded).stat().st_size
-        stored_name = f"{int(time.time())}_{file_name}"
+        stored_name = f"{int(time.time())}_{__import__('uuid').uuid4().hex}_{file_name}"
         final_path = settings.files_path / stored_name
         Path(downloaded).rename(final_path)
 
@@ -212,14 +219,26 @@ async def text_handler(client: Client, message: Message):
     if not (text.startswith("http://") or text.startswith("https://")):
         return
 
-    # Simple URL download support
+    # Only fetch public HTTP(S) destinations; do not allow SSRF to internal services.
     status = await message.reply_text("⬇️ در حال دانلود از لینک...")
 
     try:
         import httpx
+        import socket
+        import ipaddress
         from urllib.parse import urlparse, unquote
 
-        async with httpx.AsyncClient(follow_redirects=True, timeout=None) as http:
+        parsed_url = urlparse(text)
+        if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname or parsed_url.username or parsed_url.password:
+            raise ValueError("فقط URL عمومی HTTP/HTTPS معتبر پذیرفته می‌شود")
+        try:
+            addresses = {item[4][0] for item in socket.getaddrinfo(parsed_url.hostname, parsed_url.port or (443 if parsed_url.scheme == "https" else 80), type=socket.SOCK_STREAM)}
+        except OSError as exc:
+            raise ValueError("دامنه قابل resolve نیست") from exc
+        if not addresses or any(not ipaddress.ip_address(addr).is_global for addr in addresses):
+            raise ValueError("دانلود از آدرس‌های داخلی یا غیرعمومی مجاز نیست")
+
+        async with httpx.AsyncClient(follow_redirects=False, timeout=httpx.Timeout(60.0, read=60.0)) as http:
             async with http.stream("GET", text) as resp:
                 if resp.status_code != 200:
                     await status.edit_text(f"❌ خطای HTTP: {resp.status_code}")
@@ -230,25 +249,37 @@ async def text_handler(client: Client, message: Message):
                     await status.edit_text("❌ فایل بزرگ‌تر از حد مجاز است.")
                     return
 
-                # Guess filename
-                cd = resp.headers.get("content-disposition", "")
-                if "filename=" in cd:
-                    file_name = cd.split("filename=")[-1].strip('"\' ')
-                else:
-                    path = urlparse(text).path
-                    file_name = unquote(Path(path).name) or f"download_{int(time.time())}"
+                # Refuse redirects so a public URL cannot redirect the bot to localhost/private services.
+                if resp.is_redirect:
+                    await status.edit_text("❌ لینک‌های تغییرمسیر (redirect) پشتیبانی نمی‌شوند؛ لینک مستقیم را بفرستید.")
+                    return
 
-                stored_name = f"{int(time.time())}_{file_name}"
+                cd = resp.headers.get("content-disposition", "")
+                file_name = ""
+                if "filename*=" in cd.lower():
+                    import re
+                    match = re.search(r"filename\*=UTF-8''([^;]+)", cd, re.IGNORECASE)
+                    if match:
+                        file_name = unquote(match.group(1))
+                if not file_name and "filename=" in cd.lower():
+                    file_name = cd.split("filename=", 1)[1].strip().strip('"\' ')
+                if not file_name:
+                    file_name = unquote(Path(urlparse(text).path).name)
+                file_name = safe_filename(file_name, f"download_{int(time.time())}")
+                stored_name = f"{int(time.time())}_{__import__('uuid').uuid4().hex}_{file_name}"
                 final_path = settings.files_path / stored_name
+                temp_path = final_path.with_suffix(final_path.suffix + ".part")
 
                 downloaded = 0
                 start_time = time.time()
                 last_update = 0
 
-                with open(final_path, "wb") as f:
+                with open(temp_path, "wb") as f:
                     async for chunk in resp.aiter_bytes(chunk_size=1024 * 1024):
-                        f.write(chunk)
                         downloaded += len(chunk)
+                        if downloaded > settings.max_file_size_bytes:
+                            raise ValueError("حجم فایل از حد مجاز بیشتر است")
+                        f.write(chunk)
                         now = time.time()
                         if now - last_update > 2:
                             last_update = now
@@ -266,6 +297,7 @@ async def text_handler(client: Client, message: Message):
                                 )
                             except Exception:
                                 pass
+                temp_path.replace(final_path)
 
         final_size = final_path.stat().st_size
         file_id = add_file(
@@ -285,7 +317,15 @@ async def text_handler(client: Client, message: Message):
         )
 
     except Exception as e:
-        await status.edit_text(f"❌ خطا:\n`{str(e)[:300]}`")
+        try:
+            if "temp_path" in locals() and temp_path.exists():
+                temp_path.unlink()
+        except OSError:
+            pass
+        try:
+            await status.edit_text(f"❌ خطا:\n`{str(e)[:300]}`")
+        except Exception:
+            pass
 
 
 async def main():

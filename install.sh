@@ -29,7 +29,7 @@ SKIP_WIZARD=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode) MODE="$2"; shift 2 ;;
+        --mode) [[ $# -ge 2 ]] || err "--mode requires a value"; MODE="$2"; shift 2 ;;
         --no-start) NO_START=1; shift ;;
         --skip-wizard) SKIP_WIZARD=1; shift ;;
         --help|-h)
@@ -51,6 +51,10 @@ has_systemd() {
     command -v systemctl >/dev/null 2>&1 && [[ "$(ps -p 1 -o comm= 2>/dev/null || true)" == "systemd" ]]
 }
 
+if [[ ! "$MODE" =~ ^(auto|systemd|foreground)$ ]]; then
+    err "Invalid mode: $MODE (use auto, systemd, or foreground)"
+fi
+
 if [[ "$MODE" == "auto" ]]; then
     if has_systemd; then
         MODE="systemd"
@@ -66,6 +70,9 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 info "Python version: $PY_VER"
+if ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    err "Python 3.10 or newer is required"
+fi
 
 # Install system packages if possible
 if command -v apt-get >/dev/null 2>&1; then
@@ -133,12 +140,21 @@ if [[ $SKIP_WIZARD -eq 0 ]]; then
     read -rp "Public base URL for download links [http://${DEFAULT_IP}:14141]: " INPUT_PUBLIC
     INPUT_PUBLIC="${INPUT_PUBLIC:-http://${DEFAULT_IP}:14141}"
 
+    read -rp "Panel username: " INPUT_PANEL_USER
+    [[ -n "$INPUT_PANEL_USER" ]] || err "Panel username is required"
+    read -rsp "Panel password (at least 16 characters): " INPUT_PANEL_PASS
+    echo ""
+    [[ ${#INPUT_PANEL_PASS} -ge 16 ]] || err "Panel password must be at least 16 characters"
+
     # Write .env
+    umask 077
     cat > .env <<EOF
 API_ID=${INPUT_API_ID}
 API_HASH=${INPUT_API_HASH}
 BOT_TOKEN=${INPUT_BOT_TOKEN}
 ADMIN_IDS=${INPUT_ADMINS}
+PANEL_USERNAME=${INPUT_PANEL_USER}
+PANEL_PASSWORD=${INPUT_PANEL_PASS}
 WEB_HOST=0.0.0.0
 WEB_PORT=14141
 PUBLIC_BASE_URL=${INPUT_PUBLIC}
